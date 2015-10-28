@@ -1,18 +1,18 @@
+
+# taken from https://github.com/Homebrew/homebrew/blob/master/Library/Formula/python3.rb
+# and adapted to use 3.3.x instead of 3.4
+# Homebrew: https://github.com/Homebrew/homebrew
+# Homebrew is licensed under BSD 2 Clause: https://github.com/Homebrew/homebrew/blob/master/LICENSE.txt
+
 require "formula"
 
-class Python3 < Formula
+class Python33 < Formula
   homepage "https://www.python.org/"
-  url "https://www.python.org/ftp/python/3.4.2/Python-3.4.2.tar.xz"
-  sha1 "0727d8a8498733baabe6f51632b9bab0cbaa9ada"
+  url "https://www.python.org/ftp/python/3.3.6/Python-3.3.6.tar.xz"
+  sha1 "0a86ae9e877467a62faed7ece208c0d6899b0991"
   revision 1
 
-  bottle do
-    sha1 "fd271aeeff5971fc8570b368603f85d551041df7" => :mavericks
-    sha1 "548aeec37a6ebbc5f0481d87dd17d260f3c17391" => :mountain_lion
-    sha1 "28b35ed1a59bae88da10235379e31554e2c0342d" => :lion
-  end
-
-  VER="3.4"  # The <major>.<minor> is used so often.
+  VER="3.3"  # The <major>.<minor> is used so often.
 
   head "https://hg.python.org/cpython", :using => :hg, :branch => VER
 
@@ -31,6 +31,16 @@ class Python3 < Formula
 
   skip_clean "bin/pip3", "bin/pip-#{VER}"
   skip_clean "bin/easy_install3", "bin/easy_install-#{VER}"
+
+  resource 'setuptools' do
+    url 'https://pypi.python.org/packages/source/s/setuptools/setuptools-2.2.tar.gz'
+    sha1 '547eff11ea46613e8a9ba5b12a89c1010ecc4e51'
+  end
+
+  resource 'pip' do
+    url 'https://pypi.python.org/packages/source/p/pip/pip-1.5.4.tar.gz'
+    sha1 '35ccb7430356186cf253615b70f8ee580610f734'
+  end
 
   patch :DATA if build.with? "brewed-tk"
 
@@ -126,9 +136,6 @@ class Python3 < Formula
     ["Headers", "Python", "Resources"].each{ |f| rm(prefix/"Frameworks/Python.framework/#{f}") }
     rm prefix/"Frameworks/Python.framework/Versions/Current"
 
-    # Remove 2to3 because python2 also installs it
-    rm bin/"2to3"
-
     # Remove the site-packages that Python created in its Cellar.
     site_packages_cellar.rmtree
   end
@@ -155,8 +162,16 @@ class Python3 < Formula
     rm_rf Dir["#{site_packages}/setuptools*"]
     rm_rf Dir["#{site_packages}/distribute*"]
 
-    # Install the bundled pip if it's newer than the installed version
-    system bin/"python3", "-m", "ensurepip", "--upgrade"
+
+    setup_args = [ "-s", "setup.py", "install", "--force", "--verbose",
+                   "--install-scripts=#{bin}", "--install-lib=#{site_packages}" ]
+
+    resource('setuptools').stage { system "#{bin}/python#{VER}", *setup_args }
+    mv bin/'easy_install', bin/"easy_install#{VER}"
+
+    resource('pip').stage { system "#{bin}/python#{VER}", *setup_args }
+    mv bin/'pip', bin/"pip#{VER}"
+
 
     # And now we write the distutils.cfg
     cfg = prefix/"Frameworks/Python.framework/Versions/#{VER}/lib/python#{VER}/distutils/distutils.cfg"
@@ -236,7 +251,7 @@ class Python3 < Formula
                '     You should `unset PYTHONPATH` to fix this.')
       else:
           # Only do this for a brewed python:
-          opt_executable = '#{opt_bin}/python#{VER}'
+          opt_executable = "#{opt_bin}/python#{VER}"
           if os.path.realpath(sys.executable) == os.path.realpath(opt_executable):
               # Remove /System site-packages, and the Cellar site-packages
               # which we moved to lib/pythonX.Y/site-packages. Further, remove
